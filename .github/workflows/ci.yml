@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t ai-study-assistant .
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: mydb
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest httpx
+
+      - name: Set up database schema
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d mydb -c "CREATE TABLE IF NOT EXISTS app_users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password_hash BYTEA NOT NULL, created_at TIMESTAMP DEFAULT NOW());"
+          PGPASSWORD=postgres psql -h localhost -U postgres -d mydb -c "CREATE TABLE IF NOT EXISTS course_notes (id SERIAL PRIMARY KEY, topic VARCHAR(100) NOT NULL, content TEXT NOT NULL);"
+          PGPASSWORD=postgres psql -h localhost -U postgres -d mydb -f seed_data.sql
+
+      - name: Run tests
+        env:
+          GROQ_API_KEY: fake-key-for-ci-testing
+          PGHOST: localhost
+          PGUSER: postgres
+        run: pytest test_main.py -v
