@@ -1,0 +1,7 @@
+fastapi==0.141.1
+uvicorn==0.52.4
+psycopg2-binary==2.9.12
+bcrypt==5.0.0
+pydantic==2.13.4
+groq==1.7.0
+scikit-learn
