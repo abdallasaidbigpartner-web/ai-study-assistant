@@ -13,9 +13,10 @@ Students often ask questions that are already answered in their own course mater
         v
     FastAPI application (main.py)
         |
-        |-- POST /register  --> bcrypt password hashing --> PostgreSQL (app_users)
-        |-- POST /login     --> bcrypt verification      --> PostgreSQL (app_users)
-        |-- POST /ask        --> TF-IDF retrieval          --> PostgreSQL (course_notes)
+        |-- POST /register  --> bcrypt password hashing --> PostgreSQL (app_users, via connection pool)
+        |-- POST /login     --> bcrypt verification      --> issues a signed JWT access token
+        |-- POST /ask        --> requires valid JWT
+        |                     --> TF-IDF retrieval          --> PostgreSQL (course_notes, via connection pool)
         |                     --> top-matching notes as context
         |                     --> Groq LLM API (grounded answer generation)
         |-- GET  /health     --> service status, version, uptime
@@ -28,8 +29,9 @@ Students often ask questions that are already answered in their own course mater
 |-----------|--------|--------|
 | Web framework | FastAPI | Async-capable, automatic request validation via Pydantic, industry-standard for Python APIs |
 | Database | PostgreSQL | Relational integrity (foreign keys, constraints), industry-standard for production systems |
-| DB driver | psycopg2 | Mature, widely-used PostgreSQL adapter for Python |
+| DB driver | psycopg2 + connection pool | `psycopg2.pool.SimpleConnectionPool` reuses connections across requests instead of opening/closing one per request |
 | Password security | bcrypt | Purpose-built, slow-by-design hashing algorithm resistant to brute-force attacks |
+| Session auth | JWT (python-jose) | Stateless, signed tokens - the client holds the session, not the server, which scales better than server-side sessions |
 | Retrieval | scikit-learn (TF-IDF + cosine similarity) | Reliable, dependency-light semantic search; scales to embeddings-based retrieval without changing the architecture |
 | LLM inference | Groq API (`openai/gpt-oss-20b`) | Low-latency inference suitable for interactive use |
 | Validation | Pydantic | Rejects malformed input before it reaches business logic or the database |
@@ -38,44 +40,54 @@ Students often ask questions that are already answered in their own course mater
 ## Security Considerations
 
 - Passwords are never stored in plain text; only bcrypt hashes are persisted.
+- Sessions use signed JWTs (HS256) with a 60-minute expiration; the server never stores session state.
 - All SQL queries use parameterized statements (`%s` placeholders), preventing SQL injection.
 - Input is validated at the API boundary (username length, password strength) before touching the database.
-- The Groq API key is read from an environment variable, never hardcoded in source.
+- The Groq API key and JWT signing secret are read from environment variables, never hardcoded in source.
 
 ## Running Locally
 
     pip install -r requirements.txt
     export GROQ_API_KEY=your_key_here
+    export JWT_SECRET=a_long_random_secret_string
     uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ## Example Usage
 
+    # Register a user
     curl -X POST http://localhost:8000/register \
       -H "Content-Type: application/json" \
       -d '{"username": "student1", "password": "StudyHard123"}'
 
+    # Log in - returns a JWT
+    curl -X POST http://localhost:8000/login \
+      -H "Content-Type: application/json" \
+      -d '{"username": "student1", "password": "StudyHard123"}'
+
+    # Ask a question, authenticated with the JWT from login
     curl -X POST http://localhost:8000/ask \
       -H "Content-Type: application/json" \
+      -H "Authorization: Bearer <your_token_here>" \
       -d '{"question": "What is overfitting in machine learning?"}'
 
 ## Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Returns service status, version, and uptime - used for monitoring |
-| `/register` | POST | Creates a new user with a bcrypt-hashed password |
-| `/login` | POST | Verifies credentials against the stored hash |
-| `/ask` | POST | Retrieves relevant course notes and returns an LLM-generated, grounded answer |
+| Endpoint | Method | Auth Required | Description |
+|----------|--------|----------------|-------------|
+| `/health` | GET | No | Returns service status, version, and uptime |
+| `/register` | POST | No | Creates a new user with a bcrypt-hashed password |
+| `/login` | POST | No | Verifies credentials, returns a JWT access token |
+| `/ask` | POST | Yes (Bearer token) | Retrieves relevant course notes and returns an LLM-generated, grounded answer |
 
 ## Known Limitations & Future Improvements
 
 - **Retrieval method:** currently uses TF-IDF (keyword-based), which can miss conceptually related content that shares no exact words. A production upgrade would use neural embeddings for true semantic matching.
-- **No session/token-based auth yet:** login verifies credentials per-request rather than issuing a session token (e.g. JWT).
-- **Single-instance database connections:** a production deployment would use a connection pool for efficiency under load.
+- **No token refresh/revocation:** tokens are valid until they expire (60 minutes); there is no refresh-token flow or server-side revocation list yet.
+- **No containerization yet for this specific project:** the broader learning-journey repos include Docker + CI examples; applying that same pattern here is a natural next step.
 
 ## Related Repositories
 
 This project draws on skills developed in a structured learning path:
-- [python-learning-journey](https://github.com/abdallasaidbigpartner-web/python-learning-journey)
-- [typescript-learning-journey](https://github.com/abdallasaidbigpartner-web/typescript-learning-journey)
-- [sql-learning-journey](https://github.com/abdallasaidbigpartner-web/sql-learning-journey)
+- [python-learning-journey](https://github.com/abdallasaidbigpartner-web/python-learning-journey) - Python fundamentals through backend engineering, machine learning, deep learning, and Generative AI
+- [typescript-learning-journey](https://github.com/abdallasaidbigpartner-web/typescript-learning-journey) - TypeScript fundamentals through classes, async/await, and automated testing
+- [sql-learning-journey](https://github.com/abdallasaidbigpartner-web/sql-learning-journey) - SQL and PostgreSQL fundamentals through transactions, indexing, and query optimization

@@ -3,13 +3,13 @@ Automated tests for the AI Study Assistant capstone.
 
 Uses FastAPI's TestClient for endpoint-level tests, and mocks the
 Groq API call in the /ask test to avoid real network calls during
-testing - the same professional pattern used in the learning-journey
-repos' test suites.
+testing. Also verifies JWT-based authentication: /ask requires a
+valid token, and rejects missing/invalid ones.
 """
 
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
-from main import app, retrieve_relevant_notes
+from main import app, retrieve_relevant_notes, create_access_token
 
 client = TestClient(app)
 
@@ -38,6 +38,20 @@ def test_login_rejects_nonexistent_user():
     assert response.status_code == 401
 
 
+def test_ask_rejects_missing_token():
+    response = client.post("/ask", json={"question": "What is overfitting?"})
+    assert response.status_code == 403 or response.status_code == 401
+
+
+def test_ask_rejects_invalid_token():
+    response = client.post(
+        "/ask",
+        json={"question": "What is overfitting?"},
+        headers={"Authorization": "Bearer not-a-real-token"},
+    )
+    assert response.status_code == 401
+
+
 def test_retrieve_relevant_notes_returns_results():
     """Verify retrieval returns notes from the real database (integration test)."""
     results = retrieve_relevant_notes("What is overfitting?")
@@ -47,15 +61,21 @@ def test_retrieve_relevant_notes_returns_results():
 
 
 @patch("main.client")
-def test_ask_endpoint_with_mocked_llm(mock_groq_client):
-    """Verify /ask correctly assembles a response, without a real LLM call."""
+def test_ask_endpoint_with_valid_token_and_mocked_llm(mock_groq_client):
+    """Verify /ask works correctly with a valid token, without a real LLM call."""
     mock_response = MagicMock()
     mock_response.choices[0].message.content = "Mocked grounded answer."
     mock_groq_client.chat.completions.create.return_value = mock_response
 
-    response = client.post("/ask", json={"question": "What is overfitting?"})
+    token = create_access_token("test_user")
+    response = client.post(
+        "/ask",
+        json={"question": "What is overfitting?"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
 
     assert response.status_code == 200
     data = response.json()
     assert data["answer"] == "Mocked grounded answer."
+    assert data["asked_by"] == "test_user"
     assert "sources" in data
