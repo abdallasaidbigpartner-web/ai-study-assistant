@@ -1,5 +1,7 @@
 # AI Study Assistant
 
+![CI](https://github.com/abdallasaidbigpartner-web/ai-study-assistant/actions/workflows/ci.yml/badge.svg)
+
 A complete, production-style backend system combining authentication, a real relational database, and Retrieval-Augmented Generation (RAG) into a single working application. This project is a capstone that integrates skills developed across a broader software and AI engineering learning path, demonstrating the ability to design, build, secure, and operate a real system end-to-end - not just isolated exercises.
 
 ## Problem It Solves
