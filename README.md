@@ -91,3 +91,7 @@ This project draws on skills developed in a structured learning path:
 - [python-learning-journey](https://github.com/abdallasaidbigpartner-web/python-learning-journey) - Python fundamentals through backend engineering, machine learning, deep learning, and Generative AI
 - [typescript-learning-journey](https://github.com/abdallasaidbigpartner-web/typescript-learning-journey) - TypeScript fundamentals through classes, async/await, and automated testing
 - [sql-learning-journey](https://github.com/abdallasaidbigpartner-web/sql-learning-journey) - SQL and PostgreSQL fundamentals through transactions, indexing, and query optimization
+- [study-assistant-frontend](https://github.com/abdallasaidbigpartner-web/study-assistant-frontend) - the React frontend for this backend
+- [task-manager-api](https://github.com/abdallasaidbigpartner-web/task-manager-api) - TypeScript backend capstone
+- [ecommerce-database](https://github.com/abdallasaidbigpartner-web/ecommerce-database) - SQL capstone
+- [url-shortener-go](https://github.com/abdallasaidbigpartner-web/url-shortener-go) - Go capstone
