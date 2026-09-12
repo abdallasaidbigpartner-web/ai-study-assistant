@@ -20,6 +20,7 @@ import bcrypt
 import psycopg2
 import psycopg2.pool
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from groq import Groq
 from jose import jwt, JWTError
@@ -31,6 +32,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger("ai_study_assistant")
 
 app = FastAPI(title="AI Study Assistant", version="1.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 APP_VERSION = "1.1.0"
